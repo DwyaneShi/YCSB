@@ -715,11 +715,15 @@ public class CoreWorkload extends Workload {
 
     switch (operation) {
     case "READ":
-      double rand = readwitherasureschooser.sample();
-      if (rand < readwitherasuresvariable) {
-        doTransactionRead(db);
+      if (readwitherasuresproportion > 0) {
+        double rand = readwitherasureschooser.sample();
+        if (rand < readwitherasuresvariable) {
+          doTransactionRead(db);
+        } else {
+          doTransactionReadWithErasures(db);
+        }
       } else {
-        doTransactionReadWithErasures(db);
+        doTransactionRead(db);
       }
       break;
     case "UPDATE":
