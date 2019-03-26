@@ -693,8 +693,8 @@ public class CoreWorkload extends Workload {
       doTransactionRead(db);
       break;
     case "READWITHERASURES":
-        doTransactionReadWithErasures(db);
-        break;
+      doTransactionReadWithErasures(db);
+      break;
     case "UPDATE":
       doTransactionUpdate(db);
       break;
