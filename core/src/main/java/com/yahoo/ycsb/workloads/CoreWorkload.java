@@ -211,7 +211,7 @@ public class CoreWorkload extends Workload {
   /**
    * The default proportion of transactions that are read_with_erasures.
    */
-  public static final String READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT = "0.05";
+  public static final String READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT = "0";
 
   /**
    * The name of the property for the k parameter in RS(k,m).
@@ -528,7 +528,7 @@ public class CoreWorkload extends Workload {
       }
       String readwitherasuresdistrib = p.getProperty(
           READ_WITH_ERASURES_DISTRIBUTION_PROPERTY,
-          READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT);
+          READ_WITH_ERASURES_DISTRIBUTION_PROPERTY_DEFAULT);
       if (readwitherasuresdistrib.compareTo("weibull") == 0) {
         readwitherasureschooser = new WeibullDistribution(0.7, 1);
         readwitherasuresvariable = readwitherasureschooser.inverseCumulativeProbability(1 - readwitherasuresproportion);
