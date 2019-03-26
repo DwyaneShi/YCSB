@@ -788,7 +788,7 @@ public class CoreWorkload extends Workload {
     NumberGenerator erasureGenerator = new UniformLongGenerator(0, eckparam - 1);
     List<Integer> erasures = new ArrayList<>();
     for (int i = 0; i < erasurecount; i++) {
-      erasures.add((int) erasureGenerator.nextValue());
+      erasures.add(erasureGenerator.nextValue().intValue());
     }
 
     HashSet<String> fields = null;
