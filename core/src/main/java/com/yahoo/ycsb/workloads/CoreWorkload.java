@@ -21,6 +21,8 @@ import com.yahoo.ycsb.*;
 import com.yahoo.ycsb.generator.*;
 import com.yahoo.ycsb.generator.UniformLongGenerator;
 import com.yahoo.ycsb.measurements.Measurements;
+import org.apache.commons.math3.distribution.RealDistribution;
+import org.apache.commons.math3.distribution.WeibullDistribution;
 
 import java.io.IOException;
 import java.util.*;
@@ -194,6 +196,12 @@ public class CoreWorkload extends Workload {
    * The default proportion of transactions that are reads.
    */
   public static final String READ_PROPORTION_PROPERTY_DEFAULT = "0.95";
+
+  public static final String READ_WITH_ERASURES_DISTRIBUTION_PROPERTY = "readwitherasuresdistribution";
+  /**
+   * The default distribution for read_with_erasures.
+   */
+  public static final String READ_WITH_ERASURES_DISTRIBUTION_PROPERTY_DEFAULT = "weibull";
 
   /**
    * The name of the property for the proportion of transactions that are read_with_erasures.
@@ -393,6 +401,9 @@ public class CoreWorkload extends Workload {
   protected int zeropadding;
   protected int insertionRetryLimit;
   protected int insertionRetryInterval;
+  protected RealDistribution readwitherasureschooser;
+  protected double readwitherasuresproportion;
+  protected double readwitherasuresvariable;
   protected int eckparam;
   protected int ecmparam;
   protected int erasurecount;
@@ -505,11 +516,25 @@ public class CoreWorkload extends Workload {
 
     keysequence = new CounterGenerator(insertstart);
     operationchooser = createOperationGenerator(p);
-    eckparam = Integer.parseInt(p.getProperty(EC_K_PARAM_PROPERTY, EC_K_PARAM_PROPERTY_DEFAULT));
-    ecmparam = Integer.parseInt(p.getProperty(EC_M_PARAM_PROPERTY, EC_M_PARAM_PROPERTY_DEFAULT));
-    erasurecount = Integer.parseInt(p.getProperty(ERASURE_COUNT_PROPERTY, ERASURE_COUNT_PROPERTY_DEFAULT));
-    if (erasurecount > ecmparam) {
-      throw new WorkloadException("erasurecount should NOT be greater than ecmparam");
+    readwitherasuresproportion = Double.parseDouble(
+        p.getProperty(READ_WITH_ERASURES_PROPORTION_PROPERTY,
+            READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT));
+    if (readwitherasuresproportion > 0) {
+      eckparam = Integer.parseInt(p.getProperty(EC_K_PARAM_PROPERTY, EC_K_PARAM_PROPERTY_DEFAULT));
+      ecmparam = Integer.parseInt(p.getProperty(EC_M_PARAM_PROPERTY, EC_M_PARAM_PROPERTY_DEFAULT));
+      erasurecount = Integer.parseInt(p.getProperty(ERASURE_COUNT_PROPERTY, ERASURE_COUNT_PROPERTY_DEFAULT));
+      if (erasurecount > ecmparam) {
+        throw new WorkloadException("erasurecount should NOT be greater than ecmparam");
+      }
+      String readwitherasuresdistrib = p.getProperty(
+          READ_WITH_ERASURES_DISTRIBUTION_PROPERTY,
+          READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT);
+      if (readwitherasuresdistrib.compareTo("weibull") == 0) {
+        readwitherasureschooser = new WeibullDistribution(0.7, 1);
+        readwitherasuresvariable = readwitherasureschooser.inverseCumulativeProbability(1 - readwitherasuresproportion);
+      } else {
+        throw new WorkloadException("Unknown read_with_erasures distribution \"" + readwitherasuresdistrib + "\"");
+      }
     }
 
     transactioninsertkeysequence = new AcknowledgedCounterGenerator(recordcount);
@@ -690,10 +715,12 @@ public class CoreWorkload extends Workload {
 
     switch (operation) {
     case "READ":
-      doTransactionRead(db);
-      break;
-    case "READWITHERASURES":
-      doTransactionReadWithErasures(db);
+      double rand = readwitherasureschooser.sample();
+      if (rand < readwitherasuresvariable) {
+        doTransactionRead(db);
+      } else {
+        doTransactionReadWithErasures(db);
+      }
       break;
     case "UPDATE":
       doTransactionUpdate(db);
@@ -785,10 +812,11 @@ public class CoreWorkload extends Workload {
     String keyname = buildKeyName(keynum);
 
     // choose a set of erasures
-    NumberGenerator erasureGenerator = new UniformLongGenerator(0, eckparam - 1);
+//    NumberGenerator erasureGenerator = new UniformLongGenerator(0, eckparam - 1);
     List<Integer> erasures = new ArrayList<>();
     for (int i = 0; i < erasurecount; i++) {
-      erasures.add(erasureGenerator.nextValue().intValue());
+//      erasures.add(erasureGenerator.nextValue().intValue());
+      erasures.add(i);
     }
 
     HashSet<String> fields = null;
@@ -931,9 +959,6 @@ public class CoreWorkload extends Workload {
 
     final double readproportion = Double.parseDouble(
         p.getProperty(READ_PROPORTION_PROPERTY, READ_PROPORTION_PROPERTY_DEFAULT));
-    final double readwitherasuresproportion = Double.parseDouble(
-        p.getProperty(READ_WITH_ERASURES_PROPORTION_PROPERTY,
-            READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT));
     final double updateproportion = Double.parseDouble(
         p.getProperty(UPDATE_PROPORTION_PROPERTY, UPDATE_PROPORTION_PROPERTY_DEFAULT));
     final double insertproportion = Double.parseDouble(
@@ -946,15 +971,6 @@ public class CoreWorkload extends Workload {
     final DiscreteGenerator operationchooser = new DiscreteGenerator();
     if (readproportion > 0) {
       operationchooser.addValue(readproportion, "READ");
-    }
-
-    if (readwitherasuresproportion > 0) {
-      final int ecmparam = Integer.parseInt(p.getProperty(EC_M_PARAM_PROPERTY, EC_M_PARAM_PROPERTY_DEFAULT));
-      final int erasurecount = Integer.parseInt(p.getProperty(ERASURE_COUNT_PROPERTY, ERASURE_COUNT_PROPERTY_DEFAULT));
-      if (erasurecount > ecmparam) {
-        throw new IllegalArgumentException("erasurecount should NOT be greater than ecmparam");
-      }
-      operationchooser.addValue(readwitherasuresproportion, "READWITHERASURES");
     }
 
     if (updateproportion > 0) {
