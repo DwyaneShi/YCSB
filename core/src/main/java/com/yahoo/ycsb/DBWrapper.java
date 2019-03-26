@@ -154,8 +154,6 @@ public class DBWrapper extends DB {
    */
   public Status readWithErasures(String table, String key, Collection<Integer> erasures,
                                  Set<String> fields, Map<String, ByteIterator> result) {
-    // to warm up calc cache
-    db.readWithErasures(table, key, erasures, fields, result);
     try (final TraceScope span = tracer.newScope(scopeStringReadWithErasures)) {
       long ist = measurements.getIntendedtartTimeNs();
       long st = System.nanoTime();
