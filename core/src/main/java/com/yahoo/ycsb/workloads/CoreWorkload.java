@@ -196,6 +196,46 @@ public class CoreWorkload extends Workload {
   public static final String READ_PROPORTION_PROPERTY_DEFAULT = "0.95";
 
   /**
+   * The name of the property for the proportion of transactions that are read_with_erasures.
+   */
+  public static final String READ_WITH_ERASURES_PROPORTION_PROPERTY = "readwitherasuresproportion";
+
+  /**
+   * The default proportion of transactions that are read_with_erasures.
+   */
+  public static final String READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT = "0.05";
+
+  /**
+   * The name of the property for the k parameter in RS(k,m).
+   */
+  public static final String EC_K_PARAM_PROPERTY = "eckparam";
+
+  /**
+   * The default k parameter in RS(k,m).
+   */
+  public static final String EC_K_PARAM_PROPERTY_DEFAULT = "3";
+
+  /**
+   * The name of the property for the m parameter in RS(k,m).
+   */
+  public static final String EC_M_PARAM_PROPERTY = "ecmparam";
+
+  /**
+   * The default m parameter in RS(k,m).
+   */
+  public static final String EC_M_PARAM_PROPERTY_DEFAULT = "2";
+
+  /**
+   * The name of the property for the number of erased chunks.
+   */
+  public static final String ERASURE_COUNT_PROPERTY = "erasurecount";
+
+  /**
+   * The default number of erased chunks.
+   */
+  public static final String ERASURE_COUNT_PROPERTY_DEFAULT = "1";
+
+  /**
    * The name of the property for the proportion of transactions that are updates.
    */
   public static final String UPDATE_PROPORTION_PROPERTY = "updateproportion";
@@ -353,6 +393,9 @@ public class CoreWorkload extends Workload {
   protected int zeropadding;
   protected int insertionRetryLimit;
   protected int insertionRetryInterval;
+  protected int eckparam;
+  protected int ecmparam;
+  protected int erasurecount;
 
   private Measurements measurements = Measurements.getMeasurements();
 
@@ -462,6 +505,12 @@ public class CoreWorkload extends Workload {
 
     keysequence = new CounterGenerator(insertstart);
     operationchooser = createOperationGenerator(p);
+    eckparam = Integer.parseInt(p.getProperty(EC_K_PARAM_PROPERTY, EC_K_PARAM_PROPERTY_DEFAULT));
+    ecmparam = Integer.parseInt(p.getProperty(EC_M_PARAM_PROPERTY, EC_M_PARAM_PROPERTY_DEFAULT));
+    erasurecount = Integer.parseInt(p.getProperty(ERASURE_COUNT_PROPERTY, ERASURE_COUNT_PROPERTY_DEFAULT));
+    if (erasurecount > ecmparam) {
+      throw new WorkloadException("erasurecount should NOT be greater than ecmparam");
+    }
 
     transactioninsertkeysequence = new AcknowledgedCounterGenerator(recordcount);
     if (requestdistrib.compareTo("uniform") == 0) {
@@ -643,6 +692,9 @@ public class CoreWorkload extends Workload {
     case "READ":
       doTransactionRead(db);
       break;
+    case "READWITHERASURES":
+        doTransactionReadWithErasures(db);
+        break;
     case "UPDATE":
       doTransactionUpdate(db);
       break;
@@ -720,6 +772,40 @@ public class CoreWorkload extends Workload {
 
     HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
     db.read(table, keyname, fields, cells);
+
+    if (dataintegrity) {
+      verifyRow(keyname, cells);
+    }
+  }
+
+  public void doTransactionReadWithErasures(DB db) {
+    // choose a random key
+    long keynum = nextKeynum();
+
+    String keyname = buildKeyName(keynum);
+
+    // choose a set of erasures
+    NumberGenerator erasureGenerator = new UniformLongGenerator(0, eckparam - 1);
+    List<Integer> erasures = new ArrayList<>();
+    for (int i = 0; i < erasurecount; i++) {
+      erasures.add((int) erasureGenerator.nextValue());
+    }
+
+    HashSet<String> fields = null;
+
+    if (!readallfields) {
+      // read a random field
+      String fieldname = fieldnames.get(fieldchooser.nextValue().intValue());
+
+      fields = new HashSet<String>();
+      fields.add(fieldname);
+    } else if (dataintegrity) {
+      // pass the full field list if dataintegrity is on for verification
+      fields = new HashSet<String>(fieldnames);
+    }
+
+    HashMap<String, ByteIterator> cells = new HashMap<String, ByteIterator>();
+    db.readWithErasures(table, keyname, erasures, fields, cells);
 
     if (dataintegrity) {
       verifyRow(keyname, cells);
@@ -842,8 +928,12 @@ public class CoreWorkload extends Workload {
     if (p == null) {
       throw new IllegalArgumentException("Properties object cannot be null");
     }
+
     final double readproportion = Double.parseDouble(
         p.getProperty(READ_PROPORTION_PROPERTY, READ_PROPORTION_PROPERTY_DEFAULT));
+    final double readwitherasuresproportion = Double.parseDouble(
+        p.getProperty(READ_WITH_ERASURES_PROPORTION_PROPERTY,
+            READ_WITH_ERASURES_PROPORTION_PROPERTY_DEFAULT));
     final double updateproportion = Double.parseDouble(
         p.getProperty(UPDATE_PROPORTION_PROPERTY, UPDATE_PROPORTION_PROPERTY_DEFAULT));
     final double insertproportion = Double.parseDouble(
@@ -856,6 +946,15 @@ public class CoreWorkload extends Workload {
     final DiscreteGenerator operationchooser = new DiscreteGenerator();
     if (readproportion > 0) {
       operationchooser.addValue(readproportion, "READ");
+    }
+
+    if (readwitherasuresproportion > 0) {
+      final int ecmparam = Integer.parseInt(p.getProperty(EC_M_PARAM_PROPERTY, EC_M_PARAM_PROPERTY_DEFAULT));
+      final int erasurecount = Integer.parseInt(p.getProperty(ERASURE_COUNT_PROPERTY, ERASURE_COUNT_PROPERTY_DEFAULT));
+      if (erasurecount > ecmparam) {
+        throw new IllegalArgumentException("erasurecount should NOT be greater than ecmparam");
+      }
+      operationchooser.addValue(readmodifywriteproportion, "READWITHERASURES");
     }
 
     if (updateproportion > 0) {
