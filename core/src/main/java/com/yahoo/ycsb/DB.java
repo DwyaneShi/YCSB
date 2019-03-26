@@ -85,7 +85,7 @@ public abstract class DB {
   public abstract Status read(String table, String key, Set<String> fields, Map<String, ByteIterator> result);
 
   /**
-   * Read a record by explicitlly indicating erased chunks from the database.
+   * Read a record by explicitly indicating erased chunks from the database.
    * Each field/value pair from the result will be stored in a HashMap.
    *
    * @param table The name of the table

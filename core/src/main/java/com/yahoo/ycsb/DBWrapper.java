@@ -46,6 +46,7 @@ public class DBWrapper extends DB {
   private final String scopeStringInit;
   private final String scopeStringInsert;
   private final String scopeStringRead;
+  private final String scopeStringReadWithErasures;
   private final String scopeStringScan;
   private final String scopeStringUpdate;
 
@@ -59,6 +60,7 @@ public class DBWrapper extends DB {
     scopeStringInit = simple + "#init";
     scopeStringInsert = simple + "#insert";
     scopeStringRead = simple + "#read";
+    scopeStringReadWithErasures = simple + "#readwitherasures";
     scopeStringScan = simple + "#scan";
     scopeStringUpdate = simple + "#update";
   }
@@ -136,6 +138,29 @@ public class DBWrapper extends DB {
       long en = System.nanoTime();
       measure("READ", res, ist, st, en);
       measurements.reportStatus("READ", res);
+      return res;
+    }
+  }
+
+  /**
+   * Read a record from the database. Each field/value pair from the result
+   * will be stored in a HashMap.
+   *
+   * @param table The name of the table
+   * @param key The record key of the record to read.
+   * @param fields The list of fields to read, or null for all of them
+   * @param result A HashMap of field/value pairs for the result
+   * @return The result of the operation.
+   */
+  public Status readWithErasures(String table, String key, Collection<Integer> erasures,
+                                 Set<String> fields, Map<String, ByteIterator> result) {
+    try (final TraceScope span = tracer.newScope(scopeStringReadWithErasures)) {
+      long ist = measurements.getIntendedtartTimeNs();
+      long st = System.nanoTime();
+      Status res = db.readWithErasures(table, key, erasures, fields, result);
+      long en = System.nanoTime();
+      measure("READWITHERASURES", res, ist, st, en);
+      measurements.reportStatus("READWITHERASURES", res);
       return res;
     }
   }
