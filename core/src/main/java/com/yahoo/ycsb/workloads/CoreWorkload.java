@@ -954,7 +954,7 @@ public class CoreWorkload extends Workload {
       if (erasurecount > ecmparam) {
         throw new IllegalArgumentException("erasurecount should NOT be greater than ecmparam");
       }
-      operationchooser.addValue(readmodifywriteproportion, "READWITHERASURES");
+      operationchooser.addValue(readwitherasuresproportion, "READWITHERASURES");
     }
 
     if (updateproportion > 0) {
