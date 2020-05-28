@@ -196,10 +196,9 @@ public class MemcachedClient extends DB {
     try {
       GetFuture<Object> future = memcachedClient().asyncGetWithErasures(key, erasures);
       Object document = future.get();
-      if (document != null) {
-        fromJson((String) document, fields, result);
-      }
-      return Status.OK;
+      // we don't check the response of readWithErasures,
+      // since it may not be in json format
+      return document != null ? Status.OK : Status.ERROR;
     } catch (Exception e) {
       logger.error("Error encountered for key: " + key, e);
       return Status.ERROR;
